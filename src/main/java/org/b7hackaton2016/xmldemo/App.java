@@ -9,11 +9,17 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+
 import org.apache.commons.io.IOUtils;
+import org.xml.sax.SAXException;
+import org.xml.sax.Attributes;
+import org.xml.sax.helpers.DefaultHandler;
 
 /**
- * this demo app will read xml data of population per city in Israel, and
- * xml data of cellular antennas in Israel. It will them calculate antennas per
+ * this demo app will read xml data of population per city in Israel, and xml
+ * data of cellular antennas in Israel. It will them calculate antennas per
  * capita, and show top 5 cities
  */
 public class App {
@@ -27,15 +33,24 @@ public class App {
 
 	public static void main(String[] args) throws IOException {
 
+		Map<String, Integer> antennasPerCity = readCitiesSax(atennasFile);
+		// Map<String, Integer> antennasPerCity = readCitiesRegex(atennasFile);
+		// Exercise: Do the two function return the same values? If not - why??
+
+		TreeMap<Float, String> antennasPerCapita = readAntennasRegex(citiesFile, antennasPerCity);
+
+		printResults(antennasPerCapita);
+
+	}
+
+	private static Map<String, Integer> readCitiesRegex(String fileName) throws IOException {
+		Map<String, Integer> antennasPerCity = new HashMap<String, Integer>();
 		// read antennas from resource xml file
 		StringWriter writer = new StringWriter();
 		InputStream antennasStream = App.class.getClassLoader().getResourceAsStream(atennasFile);
 		IOUtils.copy(antennasStream, writer, "UTF-8");
 
 		String atennasAllXml = writer.toString();
-
-		// store in hashmap - city is our primary key
-		HashMap<String, Integer> antennasPerCity = new HashMap<String, Integer>();
 
 		// regex match XML to find city name (6th Value tag in each Record tag)
 		Matcher m = Pattern.compile(
@@ -46,22 +61,70 @@ public class App {
 			Integer currentValue = antennasPerCity.getOrDefault(city, 0) + 1;
 			antennasPerCity.put(city, currentValue);
 		}
+		return antennasPerCity;
+	}
+	
+	private static Map<String, Integer> readCitiesSax(String fileName) {
+		final Map<String, Integer> antennasPerCity = new HashMap<String, Integer>();
+		try {
+
+			SAXParserFactory factory = SAXParserFactory.newInstance();
+			SAXParser saxParser = factory.newSAXParser();
+
+			DefaultHandler handler = new DefaultHandler() {
+
+				private int count = 0;
+
+				public void startElement(String uri, String localName, String qName, Attributes attributes)
+						throws SAXException {
+
+					if (qName == "Value") {
+						count++;
+					} else {
+						count = 0;
+					}
+
+				}
+
+				public void endElement(String uri, String localName, String qName) throws SAXException {
+				}
+
+				public void characters(char ch[], int start, int length) throws SAXException {
+					if (count == 6) {
+						// The 6th value in the array is the city name
+						// increment the antennas count for that city
+						String city = new String(ch, start, length);
+						Integer currentValue = antennasPerCity.getOrDefault(city, 0) + 1;
+						antennasPerCity.put(city, currentValue);
+					}
+
+				}
+
+			};
+
+			saxParser.parse(App.class.getClassLoader().getResourceAsStream(atennasFile), handler);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+		return antennasPerCity;
+	}
+
+	private static TreeMap<Float, String> readAntennasRegex(String fileName, Map<String, Integer> antennasPerCity) throws IOException {
+		TreeMap<Float, String> antennasPerCapita = new TreeMap<Float, String>();
 
 		// read population per city
-		writer = new StringWriter();
+		StringWriter writer = new StringWriter();
 		InputStream citiesStream = App.class.getClassLoader().getResourceAsStream(citiesFile);
 
 		IOUtils.copy(citiesStream, writer, "UTF-8");
 		String citiesAllXml = writer.toString();
 
-		// the key is antennas divided to population, value is city name
-		TreeMap<Float, String> antennasPerCapita = new TreeMap<Float, String>();
-
-		// regex match XML to find city name and population (6th Value tag in
-		// each Record tag)
+		// regex match XML to find city name and population 
 		final String CityName = "שםישוב";
 		final String Total = "סהכ";
-		m = Pattern
+		Matcher m = Pattern
 				.compile("<" + CityName + ">\\s*(.*?)\\s*</" + CityName + ">.*?<" + Total + ">\\s*(.*?)\\s*</" + Total,
 						Pattern.DOTALL)
 				.matcher(citiesAllXml);
@@ -75,6 +138,10 @@ public class App {
 			}
 		}
 
+		return antennasPerCapita;
+	}
+
+	private static void printResults(TreeMap<Float, String> antennasPerCapita) {
 		// read top 5 cities
 		System.out.println("Top 5 cities: number of cellular antennas per 1000 persons: ");
 		int count = 0;
