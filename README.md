@@ -15,3 +15,13 @@ The second xml is parsed using Regular Expression only.
 
 The data files were downloaded from https://data.gov.il/dataset
 
+## Rekarks ##
+
+* Make sure that the XML file is encoded in UTF-8
+
+* When crossing data in run-time, use proper classes. For example we used TreeMap to optimize ranking the results.
+
+## C# reference ##
+
+https://support.microsoft.com/he-il/kb/307548
+ 
